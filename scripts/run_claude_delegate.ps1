@@ -14,13 +14,13 @@ param(
     [int]$TimeoutSeconds = 0,
 
     [ValidateRange(30, 86400)]
-    [int]$IdleTimeoutSeconds = 1200,
+    [int]$IdleTimeoutSeconds = 600,
 
     [ValidateRange(1, 300)]
     [int]$PollSeconds = 30,
 
     [ValidateRange(1, 3600)]
-    [int]$StatusSeconds = 300,
+    [int]$StatusSeconds = 180,
 
     [ValidateRange(1, 10000)]
     [int]$TailLines = 200,
@@ -104,7 +104,8 @@ function Invoke-ClaudeAttempt {
         Write-Host "Claude PID: $($process.Id)"
 
         while (-not $process.HasExited) {
-            Start-Sleep -Seconds $Poll
+            $waitMilliseconds = [Math]::Min($Poll * 1000, 1000)
+            [void]$process.WaitForExit($waitMilliseconds)
 
             $now = Get-Date
             $elapsedSeconds = [int]($now - $startTime).TotalSeconds

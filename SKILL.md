@@ -34,7 +34,7 @@ Use this skill when Codex should be the planner, reviewer, verifier, and committ
      - an instruction not to commit.
    - Use timeout controls for non-trivial tasks:
      ```powershell
-     & "$env:CODEX_HOME\skills\codex-delegate-claude\scripts\run_claude_delegate.ps1" -Prompt "<implementation prompt>" -IdleTimeoutSeconds 1200 -PollSeconds 30 -StatusSeconds 300
+     & "$env:CODEX_HOME\skills\codex-delegate-claude\scripts\run_claude_delegate.ps1" -Prompt "<implementation prompt>" -IdleTimeoutSeconds 600 -PollSeconds 30 -StatusSeconds 180
      ```
    - Prefer idle timeout over total timeout for large tasks. Use `-TimeoutSeconds` only when there is a real wall-clock budget.
    - Keep status output sparse. Frequent heartbeats increase Codex-visible token usage without improving the task.
@@ -117,10 +117,11 @@ Script status behavior:
 
 Default controls:
 - `-TimeoutSeconds 0` disables total wall-clock timeout.
-- `-IdleTimeoutSeconds 1200` allows up to 20 minutes without stdout/stderr before stopping Claude.
-- `-PollSeconds 30` checks process and log activity every 30 seconds without printing every check.
-- `-StatusSeconds 300` prints one heartbeat every 5 minutes.
+- `-IdleTimeoutSeconds 600` allows up to 10 minutes without stdout/stderr before stopping Claude.
+- `-PollSeconds 30` controls log activity checks; process exit is still detected quickly.
+- `-StatusSeconds 180` prints one heartbeat every 3 minutes.
 - `-TailLines 200` prints only the tail of stdout/stderr by default.
 - `-MaxTurns 3`
 
 Use `-FullLog` only when the full Claude transcript is necessary. Prefer reading the saved log file directly for detailed diagnosis so Codex does not spend tokens on large logs.
+For simple tasks, Claude completion should return control to Codex promptly; do not wait for `PollSeconds` or `StatusSeconds` before reviewing the diff and continuing.
