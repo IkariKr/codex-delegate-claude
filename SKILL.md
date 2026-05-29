@@ -34,11 +34,13 @@ Use this skill when Codex should be the planner, reviewer, verifier, and committ
      - an instruction not to commit.
    - Use timeout controls for non-trivial tasks:
      ```powershell
-     & "$env:CODEX_HOME\skills\codex-delegate-claude\scripts\run_claude_delegate.ps1" -Prompt "<implementation prompt>" -TimeoutSeconds 1800 -IdleTimeoutSeconds 600 -PollSeconds 15
+     & "$env:CODEX_HOME\skills\codex-delegate-claude\scripts\run_claude_delegate.ps1" -Prompt "<implementation prompt>" -IdleTimeoutSeconds 1200 -PollSeconds 30 -StatusSeconds 300
      ```
+   - Prefer idle timeout over total timeout for large tasks. Use `-TimeoutSeconds` only when there is a real wall-clock budget.
+   - Keep status output sparse. Frequent heartbeats increase Codex-visible token usage without improving the task.
 
 4. Handle stalled Claude runs.
-   - Treat exit code `124` as total timeout and exit code `125` as idle timeout.
+   - Treat exit code `124` as optional total timeout and exit code `125` as idle timeout.
    - When Claude times out or produces no output past the idle limit, the wrapper kills the Claude process tree.
    - After a timeout, immediately inspect `git status --short` and `git diff`.
    - If Claude produced useful partial edits, review and verify them before deciding whether to continue.
@@ -114,7 +116,11 @@ Script status behavior:
 - Any other non-zero code: Claude failed or was interrupted.
 
 Default controls:
-- `-TimeoutSeconds 1800`
-- `-IdleTimeoutSeconds 600`
-- `-PollSeconds 15`
+- `-TimeoutSeconds 0` disables total wall-clock timeout.
+- `-IdleTimeoutSeconds 1200` allows up to 20 minutes without stdout/stderr before stopping Claude.
+- `-PollSeconds 30` checks process and log activity every 30 seconds without printing every check.
+- `-StatusSeconds 300` prints one heartbeat every 5 minutes.
+- `-TailLines 200` prints only the tail of stdout/stderr by default.
 - `-MaxTurns 3`
+
+Use `-FullLog` only when the full Claude transcript is necessary. Prefer reading the saved log file directly for detailed diagnosis so Codex does not spend tokens on large logs.

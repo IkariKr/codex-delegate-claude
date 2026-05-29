@@ -10,14 +10,22 @@ param(
     [ValidateSet("acceptEdits", "bypassPermissions", "default", "delegate", "dontAsk", "plan")]
     [string]$PermissionMode = "acceptEdits",
 
-    [ValidateRange(30, 86400)]
-    [int]$TimeoutSeconds = 1800,
+    [ValidateRange(0, 604800)]
+    [int]$TimeoutSeconds = 0,
 
     [ValidateRange(30, 86400)]
-    [int]$IdleTimeoutSeconds = 600,
+    [int]$IdleTimeoutSeconds = 1200,
 
     [ValidateRange(1, 300)]
-    [int]$PollSeconds = 15,
+    [int]$PollSeconds = 30,
+
+    [ValidateRange(1, 3600)]
+    [int]$StatusSeconds = 300,
+
+    [ValidateRange(1, 10000)]
+    [int]$TailLines = 200,
+
+    [switch]$FullLog,
 
     [switch]$WhatIf
 )
@@ -72,12 +80,13 @@ function Invoke-ClaudeAttempt {
         [string]$StderrPath,
         [int]$Timeout,
         [int]$IdleTimeout,
-        [int]$Poll
+        [int]$Poll,
+        [int]$StatusInterval
     )
 
     $startTime = Get-Date
     $lastActivityTime = $startTime
-    $lastStatusTime = $startTime.AddSeconds(-1 * $Poll)
+    $lastStatusTime = $startTime
     $lastStdoutLength = 0
     $lastStderrLength = 0
 
@@ -110,12 +119,12 @@ function Invoke-ClaudeAttempt {
 
             $idleSeconds = [int]($now - $lastActivityTime).TotalSeconds
 
-            if (($now - $lastStatusTime).TotalSeconds -ge $Poll) {
+            if (($now - $lastStatusTime).TotalSeconds -ge $StatusInterval) {
                 Write-Host "Claude still running: elapsed=${elapsedSeconds}s idle=${idleSeconds}s pid=$($process.Id)"
                 $lastStatusTime = $now
             }
 
-            if ($elapsedSeconds -ge $Timeout) {
+            if ($Timeout -gt 0 -and $elapsedSeconds -ge $Timeout) {
                 Write-Warning "Claude exceeded TimeoutSeconds=$Timeout. Killing process tree and returning exit code 124."
                 Stop-ProcessTree -ProcessId $process.Id
                 return 124
@@ -157,9 +166,16 @@ Write-Host "Workdir: $resolvedWorkdir"
 Write-Host "Claude: $claudePath"
 Write-Host "PermissionMode: $PermissionMode"
 Write-Host "MaxTurns: $MaxTurns"
-Write-Host "TimeoutSeconds: $TimeoutSeconds"
+if ($TimeoutSeconds -gt 0) {
+    Write-Host "TimeoutSeconds: $TimeoutSeconds"
+} else {
+    Write-Host "TimeoutSeconds: disabled"
+}
 Write-Host "IdleTimeoutSeconds: $IdleTimeoutSeconds"
 Write-Host "PollSeconds: $PollSeconds"
+Write-Host "StatusSeconds: $StatusSeconds"
+Write-Host "TailLines: $TailLines"
+Write-Host "FullLog: $FullLog"
 Write-Host "StdoutLog: $stdoutLog"
 Write-Host "StderrLog: $stderrLog"
 
@@ -188,7 +204,8 @@ try {
             -StderrPath $stderrLog `
             -Timeout $TimeoutSeconds `
             -IdleTimeout $IdleTimeoutSeconds `
-            -Poll $PollSeconds
+            -Poll $PollSeconds `
+            -StatusInterval $StatusSeconds
 
         if ($exitCode -eq 0) {
             break
@@ -208,15 +225,31 @@ try {
     }
 
     Write-Host ""
-    Write-Host "Claude stdout:"
+    if ($FullLog) {
+        Write-Host "Claude stdout:"
+    } else {
+        Write-Host "Claude stdout tail ($TailLines lines):"
+    }
     if (Test-Path -LiteralPath $stdoutLog) {
-        Get-Content -LiteralPath $stdoutLog
+        if ($FullLog) {
+            Get-Content -LiteralPath $stdoutLog
+        } else {
+            Get-Content -LiteralPath $stdoutLog -Tail $TailLines
+        }
     }
 
     Write-Host ""
-    Write-Host "Claude stderr:"
+    if ($FullLog) {
+        Write-Host "Claude stderr:"
+    } else {
+        Write-Host "Claude stderr tail ($TailLines lines):"
+    }
     if (Test-Path -LiteralPath $stderrLog) {
-        Get-Content -LiteralPath $stderrLog
+        if ($FullLog) {
+            Get-Content -LiteralPath $stderrLog
+        } else {
+            Get-Content -LiteralPath $stderrLog -Tail $TailLines
+        }
     }
 
     Write-Host ""
