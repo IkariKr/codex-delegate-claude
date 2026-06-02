@@ -10,6 +10,17 @@ param(
     [ValidateSet("acceptEdits", "bypassPermissions", "default", "delegate", "dontAsk", "plan")]
     [string]$PermissionMode = "acceptEdits",
 
+    [ValidateSet("json", "stream-json")]
+    [string]$OutputFormat = "json",
+
+    [string[]]$AllowedTools = @(),
+
+    [string[]]$DisallowedTools = @("Bash"),
+
+    [switch]$AllowBash,
+
+    [double]$MaxBudgetUsd = 0,
+
     [ValidateRange(0, 604800)]
     [int]$TimeoutSeconds = 0,
 
@@ -157,17 +168,45 @@ $logRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-delegate-claude"
 $stdoutLog = Join-Path $logRoot "claude-$timestamp-$runId.stdout.log"
 $stderrLog = Join-Path $logRoot "claude-$timestamp-$runId.stderr.log"
 
+$effectiveDisallowedTools = @($DisallowedTools | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+if ($AllowBash) {
+    $effectiveDisallowedTools = @($effectiveDisallowedTools | Where-Object { $_ -ne "Bash" })
+}
+
 $claudeArgs = @(
     "-p",
     "--permission-mode", $PermissionMode,
-    "--output-format", "json",
-    $Prompt
+    "--output-format", $OutputFormat
 )
+
+if ($OutputFormat -eq "stream-json") {
+    $claudeArgs += "--verbose"
+    $claudeArgs += "--include-partial-messages"
+}
+
+if ($AllowedTools.Count -gt 0) {
+    $claudeArgs += "--tools=$($AllowedTools -join ',')"
+}
+
+if ($effectiveDisallowedTools.Count -gt 0) {
+    $claudeArgs += "--disallowedTools=$($effectiveDisallowedTools -join ',')"
+}
+
+if ($MaxBudgetUsd -gt 0) {
+    $claudeArgs += "--max-budget-usd"
+    $claudeArgs += ([string]::Format([Globalization.CultureInfo]::InvariantCulture, "{0}", $MaxBudgetUsd))
+}
+
+$claudeArgs += $Prompt
 
 Write-Host "Workdir: $resolvedWorkdir"
 Write-Host "Claude: $claudePath"
 Write-Host "RunId: $runId"
 Write-Host "PermissionMode: $PermissionMode"
+Write-Host "OutputFormat: $OutputFormat"
+Write-Host "AllowedTools: $(if ($AllowedTools.Count -gt 0) { $AllowedTools -join ',' } else { 'default' })"
+Write-Host "DisallowedTools: $(if ($effectiveDisallowedTools.Count -gt 0) { $effectiveDisallowedTools -join ',' } else { 'none' })"
+Write-Host "MaxBudgetUsd: $(if ($MaxBudgetUsd -gt 0) { [string]::Format([Globalization.CultureInfo]::InvariantCulture, '{0}', $MaxBudgetUsd) } else { 'disabled' })"
 Write-Host "MaxTurns: $MaxTurns"
 if ($TimeoutSeconds -gt 0) {
     Write-Host "TimeoutSeconds: $TimeoutSeconds"

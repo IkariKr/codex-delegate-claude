@@ -26,6 +26,7 @@ Use this skill when Codex should be the planner, reviewer, verifier, and committ
      ```
    - If `CODEX_HOME` is unset, use the absolute skill path or the discovered skill directory.
    - The wrapper calls Claude with `claude -p --permission-mode acceptEdits --output-format json`.
+   - By default the wrapper adds `--disallowedTools=Bash`; Codex should run verification commands after reviewing Claude's diff. Use `-AllowBash` only for tasks where Claude must run shell commands itself.
    - The prompt to Claude must include:
      - the exact user goal,
      - files or areas Claude may edit,
@@ -38,6 +39,11 @@ Use this skill when Codex should be the planner, reviewer, verifier, and committ
      ```
    - Prefer idle timeout over total timeout for large tasks. Use `-TimeoutSeconds` only when there is a real wall-clock budget.
    - Keep status output sparse. Frequent heartbeats increase Codex-visible token usage without improving the task.
+   - For long-running tasks where Claude appears active but stdout stays quiet, use streaming output so idle detection can see progress:
+     ```powershell
+     & "$env:CODEX_HOME\skills\codex-delegate-claude\scripts\run_claude_delegate.ps1" -Prompt "<implementation prompt>" -OutputFormat stream-json -TailLines 80
+     ```
+   - To bound spend or runaway tool loops, add `-MaxBudgetUsd <amount>` or a real `-TimeoutSeconds <seconds>`.
 
 4. Handle stalled Claude runs.
    - Treat exit code `124` as optional total timeout and exit code `125` as idle timeout.
@@ -123,7 +129,7 @@ Default controls:
 - `-PollSeconds 30` controls log activity checks; process exit is still detected quickly.
 - `-StatusSeconds 180` prints one heartbeat every 3 minutes.
 - `-TailLines 200` prints only the tail of stdout/stderr by default.
-- `-MaxTurns 3`
+- `-MaxTurns 3` controls wrapper retry attempts, not Claude's internal `num_turns`; the current Claude CLI does not expose a `--max-turns` option.
 
 Use `-FullLog` only when the full Claude transcript is necessary. Prefer reading the saved log file directly for detailed diagnosis so Codex does not spend tokens on large logs.
 For simple tasks, Claude completion should return control to Codex promptly; do not wait for `PollSeconds` or `StatusSeconds` before reviewing the diff and continuing.
