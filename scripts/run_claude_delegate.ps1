@@ -51,6 +51,24 @@ function Resolve-CommandPath {
         throw "Required command '$CommandName' was not found on PATH."
     }
 
+    # npm global binaries on Windows are often surfaced as .ps1 wrappers in
+    # PowerShell. Start-Process cannot launch those directly, so prefer a
+    # sibling .cmd or .exe launcher when available.
+    if (
+        $command.CommandType -eq "ExternalScript" -and
+        [System.IO.Path]::GetExtension($command.Source).Equals(".ps1", [System.StringComparison]::OrdinalIgnoreCase)
+    ) {
+        $scriptPath = $command.Source
+        $basePath = Join-Path `
+            ([System.IO.Path]::GetDirectoryName($scriptPath)) `
+            ([System.IO.Path]::GetFileNameWithoutExtension($scriptPath))
+        foreach ($candidate in @("$basePath.cmd", "$basePath.exe")) {
+            if (Test-Path -LiteralPath $candidate) {
+                return $candidate
+            }
+        }
+    }
+
     return $command.Source
 }
 
