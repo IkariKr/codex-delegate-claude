@@ -72,53 +72,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-
-function Get-DelegateAgentPackageRoot {
-    return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-}
-
-function Get-DefaultAutoConfigSearchPaths {
-    param([Parameter(Mandatory = $true)][string]$PackageRoot, [Parameter(Mandatory = $true)][string]$Workdir)
-
-    $paths = New-Object System.Collections.Generic.List[string]
-    $paths.Add((Join-Path $Workdir ".codex-delegate-agent\routing.json"))
-    $paths.Add((Join-Path $Workdir ".codex-delegate-agent.json"))
-    $paths.Add((Join-Path $PackageRoot "auto-routing.json"))
-    $paths.Add((Join-Path $PackageRoot "auto-routing.default.json"))
-    return $paths
-}
-
-function Load-AutoRoutingConfig {
-    param(
-        [string]$AutoConfigPath,
-        [Parameter(Mandatory = $true)][string]$PackageRoot,
-        [Parameter(Mandatory = $true)][string]$Workdir
-    )
-
-    $candidatePaths = New-Object System.Collections.Generic.List[string]
-
-    if (-not [string]::IsNullOrWhiteSpace($AutoConfigPath)) {
-        $candidatePaths.Add($AutoConfigPath)
-    }
-    elseif (-not [string]::IsNullOrWhiteSpace($env:CODEX_DELEGATE_AGENT_CONFIG)) {
-        $candidatePaths.Add($env:CODEX_DELEGATE_AGENT_CONFIG)
-    }
-
-    foreach ($path in (Get-DefaultAutoConfigSearchPaths -PackageRoot $PackageRoot -Workdir $Workdir)) {
-        $candidatePaths.Add($path)
-    }
-
-    foreach ($candidate in $candidatePaths) {
-        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate)) {
-            return [pscustomobject]@{
-                Path = (Resolve-Path -LiteralPath $candidate).Path
-                Config = (Get-Content -Raw -LiteralPath $candidate | ConvertFrom-Json)
-            }
-        }
-    }
-
-    throw "No auto-routing config file was found."
-}
+$modulePath = Join-Path $PSScriptRoot "AutoRoutingCommon.psm1"
+Import-Module $modulePath -Force -DisableNameChecking
 
 function Test-AvailableCommand {
     param([Parameter(Mandatory = $true)][string]$CommandName)
@@ -126,119 +81,23 @@ function Test-AvailableCommand {
     return $null -ne (Get-Command $CommandName -ErrorAction SilentlyContinue)
 }
 
-function Test-RegexListMatch {
-    param(
-        [string]$Value,
-        [object[]]$Patterns,
-        [string]$Mode = "any"
+function Get-DelegateBackendScriptPath {
+    param([Parameter(Mandatory = $true)][string]$BackendName)
+
+    $scriptName = "run_{0}_delegate.ps1" -f $BackendName
+    $candidates = @(
+        (Join-Path $PSScriptRoot $scriptName),
+        (Join-Path (Join-Path $PSScriptRoot "..\$BackendName") $scriptName),
+        (Join-Path (Join-Path $PSScriptRoot "..\..\scripts") $scriptName)
     )
 
-    if ($null -eq $Patterns -or $Patterns.Count -eq 0) {
-        return $true
-    }
-
-    $matched = @($Patterns | Where-Object { $Value -match $_ })
-    if ($Mode -eq "all") {
-        return $matched.Count -eq $Patterns.Count
-    }
-
-    return $matched.Count -gt 0
-}
-
-function Test-RuleMatches {
-    param(
-        $Rule,
-        [Parameter(Mandatory = $true)][string]$Prompt,
-        [Parameter(Mandatory = $true)][string]$Workdir
-    )
-
-    $when = $Rule.when
-    if ($null -eq $when) {
-        return $true
-    }
-
-    if ($when.prompt_any_regex -and -not (Test-RegexListMatch -Value $Prompt -Patterns $when.prompt_any_regex -Mode "any")) {
-        return $false
-    }
-
-    if ($when.prompt_all_regex -and -not (Test-RegexListMatch -Value $Prompt -Patterns $when.prompt_all_regex -Mode "all")) {
-        return $false
-    }
-
-    if ($when.workdir_any_regex -and -not (Test-RegexListMatch -Value $Workdir -Patterns $when.workdir_any_regex -Mode "any")) {
-        return $false
-    }
-
-    if ($when.workdir_all_regex -and -not (Test-RegexListMatch -Value $Workdir -Patterns $when.workdir_all_regex -Mode "all")) {
-        return $false
-    }
-
-    return $true
-}
-
-function Resolve-AutoConfiguredBackend {
-    param(
-        [Parameter(Mandatory = $true)]$RoutingConfig,
-        [Parameter(Mandatory = $true)][string]$Prompt,
-        [Parameter(Mandatory = $true)][string]$Workdir,
-        [Parameter(Mandatory = $true)][bool]$HasClaude,
-        [Parameter(Mandatory = $true)][bool]$HasOpenCode
-    )
-
-    $ruleHit = $null
-    foreach ($rule in @($RoutingConfig.Config.rules)) {
-        if (Test-RuleMatches -Rule $rule -Prompt $Prompt -Workdir $Workdir) {
-            $ruleHit = $rule
-            break
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) {
+            return (Resolve-Path -LiteralPath $candidate).Path
         }
     }
 
-    $preferredBackend = $RoutingConfig.Config.defaults.preferred_backend
-    $fallbackBackend = $RoutingConfig.Config.defaults.fallback_backend
-    $noMatchAction = $RoutingConfig.Config.defaults.on_no_match
-
-    $selectedBackend = $null
-    $reason = $null
-    if ($ruleHit) {
-        $selectedBackend = $ruleHit.backend
-        $reason = if ($ruleHit.reason) { [string]$ruleHit.reason } else { "matched rule '$($ruleHit.name)'" }
-    }
-    else {
-        switch ($noMatchAction) {
-            "fallback_backend" {
-                $selectedBackend = $fallbackBackend
-                $reason = "no rule matched; using configured fallback backend"
-            }
-            default {
-                $selectedBackend = $preferredBackend
-                $reason = "no rule matched; using configured preferred backend"
-            }
-        }
-    }
-
-    $available = @{
-        claude = $HasClaude
-        opencode = $HasOpenCode
-    }
-
-    if ($available[$selectedBackend]) {
-        return [pscustomobject]@{
-            Backend = $selectedBackend
-            Reason = $reason
-            Rule = if ($ruleHit) { $ruleHit.name } else { "" }
-        }
-    }
-
-    $fallbackCandidate = if ($selectedBackend -eq "claude") { "opencode" } else { "claude" }
-    if ($available[$fallbackCandidate]) {
-        return [pscustomobject]@{
-            Backend = $fallbackCandidate
-            Reason = "$reason; selected backend unavailable, fell back to $fallbackCandidate"
-            Rule = if ($ruleHit) { $ruleHit.name } else { "" }
-        }
-    }
-
-    throw "Neither Claude nor OpenCode was found on PATH."
+    throw "Unable to locate backend runner script '$scriptName' from '$PSScriptRoot'."
 }
 
 function Resolve-DelegateBackend {
@@ -272,14 +131,12 @@ function Resolve-DelegateBackend {
 
     if ($AutoStrategy -eq "config") {
         $routingConfig = Load-AutoRoutingConfig -AutoConfigPath $AutoConfigPath -PackageRoot $PackageRoot -Workdir $Workdir
-        $resolved = Resolve-AutoConfiguredBackend `
+        return (Resolve-AutoConfiguredBackend `
             -RoutingConfig $routingConfig `
             -Prompt $Prompt `
             -Workdir $Workdir `
             -HasClaude $hasClaude `
-            -HasOpenCode $hasOpenCode
-        $resolved | Add-Member -NotePropertyName ConfigPath -NotePropertyValue $routingConfig.Path
-        return $resolved
+            -HasOpenCode $hasOpenCode)
     }
 
     switch ($AutoStrategy) {
@@ -333,9 +190,8 @@ $resolution = Resolve-DelegateBackend `
     -Prompt $Prompt `
     -Workdir $resolvedWorkdir `
     -PackageRoot $packageRoot
-$scriptRoot = $PSScriptRoot
-$claudeScript = Join-Path $scriptRoot "run_claude_delegate.ps1"
-$opencodeScript = Join-Path $scriptRoot "run_opencode_delegate.ps1"
+$claudeScript = Get-DelegateBackendScriptPath -BackendName "claude"
+$opencodeScript = Get-DelegateBackendScriptPath -BackendName "opencode"
 
 Write-Host "Resolved backend: $($resolution.Backend)"
 Write-Host "AutoStrategy: $AutoStrategy"

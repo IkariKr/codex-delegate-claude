@@ -50,7 +50,23 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$modulePath = Join-Path $PSScriptRoot "..\shared\scripts\DelegateCommon.psm1"
+
+function Get-DelegateCommonModulePath {
+    $candidates = @(
+        (Join-Path $PSScriptRoot "..\shared\scripts\DelegateCommon.psm1"),
+        (Join-Path $PSScriptRoot "..\..\shared\scripts\DelegateCommon.psm1")
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    throw "Unable to locate DelegateCommon.psm1 from '$PSScriptRoot'."
+}
+
+$modulePath = Get-DelegateCommonModulePath
 Import-Module $modulePath -Force
 
 function Get-OpencodeIntentPatterns {

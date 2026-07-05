@@ -27,5 +27,6 @@ This repository keeps one live Claude skill at the root, while adding shared sou
 - Backend metadata is edited once under `backends/<backend>/`.
 - Backend package scripts are edited once under `backends/<backend>/` and copied into generated packages.
 - Unified auto-routing defaults are edited once under `backends/agent/auto-routing.default.json`.
+- Unified routing management logic is shared through `backends/agent/AutoRoutingCommon.psm1` and consumed by both route execution and rule management scripts.
 - Generated package files are refreshed through `scripts/build-packages.ps1`.
 - Installable packages stay self-contained because the build copies the shared PowerShell module into each package.

@@ -8,6 +8,7 @@
   "rules": [
     {
       "name": "explicit-opencode-hint",
+      "enabled": true,
       "backend": "opencode",
       "reason": "prompt explicitly asks for OpenCode or local provider routing",
       "when": {
@@ -22,6 +23,7 @@
     },
     {
       "name": "explicit-claude-hint",
+      "enabled": true,
       "backend": "claude",
       "reason": "prompt explicitly asks for Claude behavior or Claude-specific controls",
       "when": {
@@ -35,6 +37,7 @@
     },
     {
       "name": "review-plan-docs-go-to-claude",
+      "enabled": true,
       "backend": "claude",
       "reason": "review, planning, or explanation-heavy prompts default to Claude",
       "when": {
@@ -50,6 +53,7 @@
     },
     {
       "name": "small-fast-code-tasks-go-to-opencode",
+      "enabled": true,
       "backend": "opencode",
       "reason": "small implementation-oriented prompts can prefer local OpenCode routing",
       "when": {
