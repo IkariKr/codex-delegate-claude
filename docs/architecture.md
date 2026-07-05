@@ -5,6 +5,13 @@ This repository keeps one live Claude skill at the root, while adding shared sou
 Related planning documents:
 
 - `docs/v1-roadmap.md`: public release scope, milestones, and acceptance criteria for `v1`.
+- `docs/package-selection.md`: package recommendation and user-facing surface comparison.
+- `docs/installation.md`: install, build, and verification flow.
+- `docs/quickstart.md`: first-run commands for the public `v1` packages.
+- `docs/routing-guide.md`: routing contract, config precedence, and rule management.
+- `docs/troubleshooting.md`: common failure modes and recovery steps.
+- `docs/release-checklist.md`: maintainer release workflow and smoke tests.
+- `docs/v1.0.0-release-notes.md`: release messaging for the initial public version.
 
 ## Layout
 

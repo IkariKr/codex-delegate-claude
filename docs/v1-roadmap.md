@@ -2,11 +2,25 @@
 
 ## Document Status
 
-- Status: approved working draft
+- Status: release-ready working plan
 - Target: public v1 release
 - Primary package target: `packages/codex-delegate-agent`
 - Secondary package target: `packages/codex-delegate-opencode`
 - Release recommendation: ship `v1.0.0` only after all release gates in this document are green
+- Validation snapshot: required release docs added and release smoke checks passed on July 5, 2026
+
+## Current Release Status
+
+The repository is now in a `v1` release-ready state, meaning:
+
+- the required public release docs exist
+- package positioning is documented with `codex-delegate-agent` as the default recommendation
+- package build and validation checks pass
+- generated-package smoke tests for routing and rule management pass
+
+The remaining release action is operational rather than product-defining:
+
+- tag and publish the release when maintainers are ready
 
 ## Goal
 
@@ -148,15 +162,15 @@ These are intentionally deferred unless they become release blockers:
 
 ### Documentation Gaps
 
-- No dedicated installation guide exists yet.
-- No troubleshooting guide exists yet.
-- No release-oriented changelog or migration notes exist yet.
-- No explicit comparison page exists for Claude vs OpenCode vs Agent.
+- Closed in current repo state through:
+  - `docs/installation.md`
+  - `docs/troubleshooting.md`
+  - `docs/v1.0.0-release-notes.md`
+  - `docs/package-selection.md`
 
 ### Release Process Gaps
 
-- No formal release checklist exists yet.
-- No tagged release cadence or versioning convention is documented yet.
+- Closed in current repo state through `docs/release-checklist.md`.
 - No explicit compatibility matrix is documented yet.
 
 ## Workstreams
