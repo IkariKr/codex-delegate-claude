@@ -114,7 +114,7 @@ foreach ($dir in @($AddDir)) {
 }
 
 $effectivePrintTimeoutSeconds = if ($PrintTimeoutSeconds -gt 0) { $PrintTimeoutSeconds } elseif ($TimeoutSeconds -gt 0) { $TimeoutSeconds } else { 0 }
-$agyArgs = @("--print")
+$agyArgs = @()
 if (-not [string]::IsNullOrWhiteSpace($Model)) {
     $agyArgs += "--model"
     $agyArgs += $Model
@@ -133,6 +133,7 @@ foreach ($dir in $workspaceDirs) {
     $agyArgs += "--add-dir"
     $agyArgs += $dir
 }
+$agyArgs += "--print"
 $agyArgs += $Prompt
 
 Write-Host "Workdir: $resolvedWorkdir"
