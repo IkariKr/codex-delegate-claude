@@ -171,6 +171,26 @@ Look for:
 - `ProviderPreference`
 - `AllowPaidFallback`
 
+## OpenCode Provider Rejects `promptCacheKey`
+
+Some OpenAI-compatible providers reject OpenCode's optional `promptCacheKey` request field with a 400 response such as:
+
+```text
+Error from provider: Extra inputs are not permitted, field: 'promptCacheKey'
+```
+
+This is a provider-configuration compatibility issue, not a delegation prompt failure. In the affected provider entry in your OpenCode config (normally `~/.config/opencode/opencode.json`), disable cache-key injection:
+
+```json
+{
+  "options": {
+    "setCacheKey": false
+  }
+}
+```
+
+Then rerun the same minimal `opencode run` command before retrying Relay OpenCode.
+
 ## Backend Ran But I Need Logs
 
 The runtime scripts print:
